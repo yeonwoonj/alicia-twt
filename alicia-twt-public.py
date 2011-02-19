@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: cp949 -*-
+# -*- coding: utf-8 -*-
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
@@ -36,6 +36,9 @@ class BoardItem(db.Model):
 class Helper:
     def isRelease(self, host):
         return host != "localhost:8080"
+
+    def isDebug(self, host):
+        return not self.isRelease(host)
 
 helper = Helper()
 
@@ -77,8 +80,8 @@ class jmp:
 
         url = 'http://api.j.mp/v3/shorten?login=%(loginid)s&apiKey=%(apikey)s&longUrl=%(url)s' % {'loginid':self.loginid,
                                                                                                   'apikey':self.apikey,
-                                                                                                  'url':urllib.quote(s) }
-        logging.info(url)
+                                                                                                  'url':urllib.quote(s)}
+        #logging.info(url)
         res = urlfetch.fetch(url);
         if res.status_code == 200:
             json = simplejson.loads(res.content)
@@ -89,6 +92,7 @@ class jmp:
         else:
             logging.error(res.content)
             
+
         return s
 
 # ------------------------------------------------------------------------------
@@ -107,12 +111,17 @@ class AliciaHandler(webapp.RequestHandler):
     def get(self):
         url_prefix = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo='
 
-        for pageNo in range(1,10):
+        pageLimit = 10
+        host = self.request.headers["Host"]
+        if helper.isDebug(host):
+            pageLimit = 3
+
+        for pageNo in range(1,pageLimit):
             logging.info('process page %d' % pageNo)
             if self.process(url_prefix + str(pageNo)) == False:
                 break
 
-            if pageNo == 9:
+            if pageNo == (pageLimit - 1):
                 logging.error('too many unread items - stop fetching at: pageNo(%d)' % pageNo)
                 break
 
@@ -131,14 +140,14 @@ class AliciaHandler(webapp.RequestHandler):
             logging.error('urlfetch error: status_code(%d)' % res.status_code)
             return False
 
-        wholeNew = True # ¿¸√º∞° ªı∑ŒøÓ ∞‘Ω√±€¿Œ∞°?
+        wholeNew = True # Ï†ÑÏ≤¥Í∞Ä ÏÉàÎ°úÏö¥ Í≤åÏãúÍ∏ÄÏù∏Í∞Ä?
         s = res.content.decode('utf-8')
         
         #self.response.out.write('<ul>')
         re_findlist = re.compile('<td class="left top_line">(.*?)</td>', re.DOTALL)
         items = re_findlist.findall(s)
-        for item in items:
-            re_text = re.compile('title="(.*?)"', re.DOTALL)
+        for item in items[::-1]:
+            re_text = re.compile('title="(.*?)">', re.DOTALL)
             text = re_text.findall(item)
             date = re.findall('<span class="date">(.*?)</span>', item)
             link = re.findall('href="(.*?)"', item)
@@ -174,34 +183,42 @@ class AliciaHandler(webapp.RequestHandler):
         if helper.isRelease(host):
             shorten_link = jmp().shorten(link)
 
-            shorten_title = title[:30]
-            if shorten_title != title:
-                shorten_title = shorten_title.strip() + u"°¶"
-
-            shorten_cont = cont[:80]
-            if shorten_cont != cont:
-                shorten_cont = shorten_cont.strip() + u"°¶"
-
-            message = u'°∏%(title)s°π %(cont)s %(link)s' % {'title': shorten_title.strip(),
-                                                           'cont': shorten_cont.strip(),
-                                                           'date': date,
-                                                           'link' : shorten_link}
-            #self.response.out.write("[%s]%s<br />\n" % (tweet,message))
+            message = self.format_message(title,cont,date,shorten_link)
 
             item.link  = shorten_link
             if len(shorten_title+shorten_cont) < 40:
-                # ≥ π´ ¬™¿∫ ±€¿∫ ∆Æ¿≠«œ¡ˆ æ ¥¬¥Ÿ.
+                # ÎÑàÎ¨¥ ÏßßÏùÄ Í∏ÄÏùÄ Ìä∏ÏúóÌïòÏßÄ ÏïäÎäîÎã§.
                 item.tweet = True
             else:
                 item.tweet = twt().status(message)
 
         else:
+            message = self.format_message(title,cont,date,link)
+            self.response.out.write("[%s]%s<br />\n" % (tweet,message))
+            
             item.link = ""
             item.tweet = True
 
         item.put()
 
         return True
+
+    def format_message(self, title, cont, date, shorten_link):
+        shorten_title = title[:30]
+        if shorten_title != title:
+            shorten_title = shorten_title.strip() + u"‚Ä¶"
+
+        shorten_cont = cont[:80]
+        if shorten_cont != cont:
+            shorten_cont = shorten_cont.strip() + u"‚Ä¶"
+
+        message = u'„Äå%(title)s„Äç %(cont)s %(link)s' % {'title': shorten_title.strip(),
+                                                       'cont': shorten_cont.strip(),
+                                                       'date': date,
+                                                       'link' : shorten_link}
+
+        return message
+
 
 
 class TwitterClientHandler(webapp.RequestHandler):
