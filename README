@@ -10,7 +10,8 @@ Changes:
 
 How to run this program:
  1. this program runs under the Google App Engine environment.
- 2. first, install Google App Engine SDK.
- 3. fill twitter api key and j.mp url shortener api key to your own one.
- 4. run the program locally if you need some tests, or upload appspot.com for the live service.
+ 2. first, install Google App Engine SDK. (download: http://code.google.com/appengine/downloads.html)
+ 3. rename alicia-twt-public.py to alicia-twt.py.
+ 4. edit alicia-twt.py : replace twitter api key and j.mp url shortener api key with your own one.
+ 5. run the program locally(dev_appserver.py) if you need some tests, or deploy to appspot.com(appcfg.py) for the live service.
 
