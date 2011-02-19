@@ -92,7 +92,6 @@ class jmp:
         else:
             logging.error(res.content)
             
-
         return s
 
 # ------------------------------------------------------------------------------
@@ -186,7 +185,7 @@ class AliciaHandler(webapp.RequestHandler):
             message = self.format_message(title,cont,date,shorten_link)
 
             item.link  = shorten_link
-            if len(shorten_title+shorten_cont) < 40:
+            if len(message) < 77:
                 # 너무 짧은 글은 트윗하지 않는다.
                 item.tweet = True
             else:
