@@ -17,4 +17,5 @@ handlers:
 skip_files:
 - ^(.*/)?\..*
 - ^(.*/)?.*\.txt$
+- ^(.*/)?.*\.pyc$
 - ^(.*/)?.*public\.py$
