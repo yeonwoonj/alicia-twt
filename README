@@ -4,14 +4,17 @@ alicia-twt : post a tweet for each alicia freeboard's article at gametree.
 License:
  Public domain
 
+
 Changes:
  2011-02-17. inital version
  2011-02-19. add to github repo
+
 
 How to run this program:
  1. this program runs under the Google App Engine environment.
  2. first, install Google App Engine SDK. (download: http://code.google.com/appengine/downloads.html)
  3. rename alicia-twt-public.py to alicia-twt.py.
  4. edit alicia-twt.py : replace twitter api key and j.mp url shortener api key with your own one.
- 5. run the program locally(dev_appserver.py) if you need some tests, or deploy to appspot.com(appcfg.py) for the live service.
+ 5. download oauth.py (https://github.com/mikeknapp/AppEngine-OAuth-Library)
+ 6. done! run the program locally(dev_appserver.py) if you need some tests, or deploy to appspot.com(appcfg.py) for the live service.
 
