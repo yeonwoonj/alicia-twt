@@ -1,0 +1,4 @@
+cron:
+- description: process alicia freeboard
+  url: /alicia
+  schedule: every 3 minutes

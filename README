@@ -1,0 +1,16 @@
+
+alicia-twt : post a tweet for each alicia freeboard's article at gametree.
+
+License:
+ Public domain
+
+Changes:
+ 2011-02-17. inital version
+ 2011-02-19. add to github repo
+
+How to run this program:
+ 1. this program runs under the Google App Engine environment.
+ 2. first, install Google App Engine SDK.
+ 3. fill twitter api key and j.mp url shortener api key to your own one.
+ 4. run the program locally if you need some tests, or upload appspot.com for the live service.
+
