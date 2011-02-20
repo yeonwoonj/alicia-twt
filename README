@@ -6,6 +6,7 @@ License:
 
 
 Changes:
+ 2011-02-21. add mobile page for detail view (alpha)
  2011-02-19. fix improper parsing error when title contains double-quotation-mark.
  2011-02-19. fix item has been processed reversed order in a page.
  2011-02-19. add to github repo
