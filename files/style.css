@@ -1,0 +1,35 @@
+﻿#header h1 {
+ white-space:normal;
+}
+
+#loading {
+}
+
+#n-gallery img {
+ max-width:100%;
+}
+
+#comments {
+ margin-top:30px;
+}
+
+#comments li {
+ padding-left:15px;
+ /*border:black 0px solid;*/
+}
+
+#comments li.name {
+ margin:5px;
+ padding-top:3px;
+ padding-bottom:3px;
+ font-weight: bold;
+ background-color:silver;
+}
+
+#comments li.cont {
+ margin-right:10px;
+}
+
+#comments p {
+ white-space:normal;
+}

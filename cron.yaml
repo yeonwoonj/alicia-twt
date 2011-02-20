@@ -1,4 +1,5 @@
 cron:
-- description: process alicia freeboard
-  url: /alicia
+- description: crawl alicia freeboard pages
+  url: /crawl/pages
   schedule: every 3 minutes
+

@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+ <meta charset="utf-8" />
+ <title>앨리샤 자유게시판 모바일</title> 
+ <link rel='stylesheet' type='text/css' href='/files/style.css' /> 
+ <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a3/jquery.mobile-1.0a3.min.css" />
+ <script src="http://code.jquery.com/jquery-1.5.min.js"></script>
+ <script src="http://code.jquery.com/mobile/1.0a3/jquery.mobile-1.0a3.min.js"></script>
+ <script type='text/javascript' src='/files/site.js'></script>
+ <meta name="viewport" content="initial-scale=1.0" />
+ <script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-10086170-4']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+ </script>
+</head>
+<body>
+ <div data-role="page">
+  <div id="header" data-role="header" data-theme="b">
+   <h1>{{ item.title }}</h1>
+   <a href="{{ link }}" data-icon="home" data-iconpos="notext" data-direction="reverse" class="ui-btn-right jqm-home">Home</a>
+  </div>
+  <div data-role="content"> 
+   <ul data-role="listview" data-theme="g">
+    <li>글쓴이: {{ item.author }}<li>
+    <li id="main-cont"><!--{{ cont }}--></li>
+   </ul>
+   <ul id="comments" data-role="listview" data-theme="d" data-inset="true">
+    <li id="loading" data-theme="b">(로딩 중…)</li>
+   </ul>
+   <script type='text/javascript' language='javascript'>
+    load({{ item.no }});
+   </script>
+  </div>
+  <div data-role="footer" data-theme="b">
+  </div>
+ </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+﻿<html>
+<head>
+ <title>앨리샤 자유게시판 모바일</title> 
+ <link rel='stylesheet' type='text/css' href='/files/style.css' /> 
+ <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a3/jquery.mobile-1.0a3.min.css" />
+ <script src="http://code.jquery.com/jquery-1.5.min.js"></script>
+ <script src="http://code.jquery.com/mobile/1.0a3/jquery.mobile-1.0a3.min.js"></script>
+ <script type='text/javascript' src='/files/site.js'></script>
+ <script type='text/javascript' src='/files/site.js'></script>
+ <meta name="viewport" content="initial-scale=1.0" />
+ <script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-10086170-4']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+ </script>
+</head>
+<body>
+ <div data-role="page">
+  <div data-role="content"> 
+   <ul data-role="listview" data-theme="g">
+    {% for item in items %}
+    <li><a href="cont/{{ item.no }}">{{ item.title }}</a></li>
+    {% endfor %}
+   </ul>
+  </div>
+ </div>
+</body>
+</html>

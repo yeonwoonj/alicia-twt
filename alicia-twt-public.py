@@ -1,14 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from google.appengine.ext import webapp
-from google.appengine.ext.webapp import util
-
-from google.appengine.ext import db
-from google.appengine.api import urlfetch
-
-from django.utils import simplejson
-
+import os
 import re
 import string
 import datetime
@@ -17,6 +10,16 @@ import time
 import logging
 import oauth
 import urllib
+
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp import util
+
+from google.appengine.ext import db
+from google.appengine.api import urlfetch
+
+from google.appengine.ext.webapp import template
+
+from django.utils import simplejson
 
 # ------------------------------------------------------------------------------
 # DB Model
@@ -28,6 +31,9 @@ class BoardItem(db.Model):
     no    = db.IntegerProperty()
     link  = db.StringProperty()
     tweet = db.BooleanProperty()
+    author = db.StringProperty()
+    #cont_long = db.StringProperty(multiline=True)
+    #comments  = db.StringListProperty()
 
 
 # ------------------------------------------------------------------------------
@@ -41,6 +47,7 @@ class Helper:
         return not self.isRelease(host)
 
 helper = Helper()
+
 
 # ------------------------------------------------------------------------------
 # twitter api
@@ -91,7 +98,7 @@ class jmp:
                 logging.error(res.content)
         else:
             logging.error(res.content)
-            
+
         return s
 
 # ------------------------------------------------------------------------------
@@ -102,29 +109,25 @@ class MainHandler(webapp.RequestHandler):
         self.response.out.write('<a href="http://twitter.com/alicia_twt">http://twitter.com/alicia_twt</a>')
 
 # ------------------------------------------------------------------------------
-# alicia handler
+# crawl handler
 
-class AliciaHandler(webapp.RequestHandler):
+class CrawlHandler(webapp.RequestHandler):
     site = 'http://alicia.gametree.co.kr'
+    site_mobile = 'http://alicia-twt.appspot.com/m/cont/'
     
-    def get(self):
-        url_prefix = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo='
+    def get(self, mode=''):
 
-        pageLimit = 10
-        host = self.request.headers["Host"]
-        if helper.isDebug(host):
-            pageLimit = 3
+        if mode == 'pages':
+            self.processPages()            
+        elif re.search('cont/\d+', mode):
+            match = re.search('.*/(\d+)', mode)
+            if match:
+                no = match.group(1)
+                self.processCont(no)
+            else:
+                self.response.out.write("")
 
-        for pageNo in range(1,pageLimit):
-            logging.info('process page %d' % pageNo)
-            if self.process(url_prefix + str(pageNo)) == False:
-                break
-
-            if pageNo == (pageLimit - 1):
-                logging.error('too many unread items - stop fetching at: pageNo(%d)' % pageNo)
-                break
-
-    def process(self, url):
+    def processPage(self, url):
         """
         process a page, return False if already processed article had been found or an error occured.
         """
@@ -133,10 +136,10 @@ class AliciaHandler(webapp.RequestHandler):
             res = urlfetch.fetch(url)
         except Exception:
             time.sleep(5)
-            return self.process(url)
+            return self.processPage(url)
             
         if res.status_code != 200:
-            logging.error('urlfetch error: status_code(%d)' % res.status_code)
+            logging.error('processPage - urlfetch error: status_code(%d)' % res.status_code)
             return False
 
         wholeNew = True # 전체가 새로운 게시글인가?
@@ -148,16 +151,17 @@ class AliciaHandler(webapp.RequestHandler):
         for item in items[::-1]:
             re_text = re.compile('title="(.*?)">', re.DOTALL)
             text = re_text.findall(item)
+            name = re.findall('<span class="name">(.*?)</span>', item)
             date = re.findall('<span class="date">(.*?)</span>', item)
             link = re.findall('href="(.*?)"', item)
 
-            if self.processItem(text[0], text[1], date[0], self.site + link[0]) == False:
+            if self.processItem(name[0], text[0], text[1], date[0], self.site + link[0]) == False:
                 wholeNew = False
         #self.response.out.write('</ul>')
 
         return wholeNew
 
-    def processItem(self, title, cont, date, link):
+    def processItem(self, name, title, cont, date, link):
         """
         return False if already processed.
         """
@@ -173,13 +177,15 @@ class AliciaHandler(webapp.RequestHandler):
                 return False
 
         item = BoardItem(key_name=no)
-        item.title = title
-        item.text  = cont
+        item.author  = name
+        item.title   = title
+        item.text    = cont
         item.pubDate = date
-        item.no    = int(no)
+        item.no      = int(no)
 
         host = self.request.headers["Host"]
         if helper.isRelease(host):
+            link = self.site_mobile + no
             shorten_link = jmp().shorten(link)
 
             message = self.format_message(title,cont,date,shorten_link)
@@ -195,7 +201,7 @@ class AliciaHandler(webapp.RequestHandler):
             message = self.format_message(title,cont,date,link)
             self.response.out.write("[%s]%s<br />\n" % (tweet,message))
             
-            item.link = ""
+            item.link = link
             item.tweet = True
 
         item.put()
@@ -218,7 +224,141 @@ class AliciaHandler(webapp.RequestHandler):
 
         return message
 
+    def processPages(self):
+        """
+        crawl pages
+        """
+        url_prefix = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo='
 
+        pageLimit = 10
+        host = self.request.headers["Host"]
+        if helper.isDebug(host):
+            pageLimit = 3
+
+        for pageNo in range(1,pageLimit):
+            logging.info('process page %d' % pageNo)
+            if self.processPage(url_prefix + str(pageNo)) == False:
+                break
+
+            if pageNo == (pageLimit - 1):
+                logging.error('too many unread items - stop fetching at: pageNo(%d)' % pageNo)
+                break
+
+    def processCont(self, no):
+        """
+        crawl entire content and comments
+        """
+        url_prefix = 'http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&PageNo=1&BoardNo='
+        url = url_prefix + no
+        try:
+            res = urlfetch.fetch(url)
+        except Exception:
+            time.sleep(5)
+            return self.processCont(no)
+            
+        if res.status_code != 200:
+            logging.error('processCont - urlfetch error: status_code(%d)' % res.status_code)
+            return False
+
+        s = res.content.decode('utf-8')
+
+        if len(s) < 200:
+            json = u'{"result":"삭제된 게시물입니다."}'
+            return self.response.out.write(json)
+
+        # parse content
+        name = re.search('<span class="name">(.*?)</span>', s)
+        name = name.group(1)
+
+        head = s.find('<div class="n-view">')
+        tail = s.find('<div class="n-reply-up" id="n-reply-up">')
+        body = s[head:tail]
+
+        images = re.findall('"/_Files/CommunityAttach/FreeBoard/(.*?).jpg"', body)
+        imgtag = '<div id="n-gallery">'
+        for img in images:
+            imgtag += u'<img src="http://alicia.gametree.co.kr/_Files/CommunityAttach/FreeBoard/%s.jpg" alt="첨부파일" /><br />' % img
+        imgtag += '</div>'
+        imgtag = re.sub('[\r\n]','', imgtag.strip())
+        imgtag = re.sub('"', '\\"', imgtag)
+            
+        re_cont = re.compile('<div class="nv-desc noline">(.*?)</div>', re.DOTALL)
+        cont = re_cont.search(body).group(1)
+        cont = re.sub('[\r\n]','', cont.strip())
+        cont = re.sub('"', '\\"', cont)
+
+        cont_all = imgtag + cont
+
+        re_comment = re.compile('<p class="r-info"><strong>(.*?)</strong>.*?</p>.*?<p class="r-desc">(.*?)</p>', re.DOTALL)
+        comments = re_comment.findall(s)
+
+        # parse comments
+        arr = []
+        for c in comments:
+            name = c[0]
+            re_name = re.search('alt="(.*?)"', name)
+            if re_name:
+                name = re_name.group(1)
+
+            cont = re.sub('[\r\n]','', c[1])
+            cont = re.sub('"', '\\"', cont)
+
+            arr.append(simplejson.dumps({'name':name,'cont':cont}))
+
+        # make JSON string
+
+        result = len(comments)
+        if result > 0:
+            result = u'댓글 %d개' % result
+        else:
+            result = u'댓글이 없습니다.'
+
+        json = u'{"result": "%(result)s", "name": "%(name)s", "cont": "%(cont)s", "comments": [%(comments)s]}' % {'result': result,
+                                                                                                                  'name': name,
+                                                                                                                  'cont': cont_all,
+                                                                                                                  'comments': ','.join(arr)}
+
+        self.response.out.write(json)
+
+
+# ------------------------------------------------------------------------------
+# mobile handler
+
+class MobileHandler(webapp.RequestHandler):
+    
+    def get(self, mode=''):
+
+        if mode == 'list':
+            gql = BoardItem.all().order('-pubDate')
+            items = gql.fetch(100)
+            #self.response.out.write(len(items))
+
+            template_values = {
+                'items' : items
+                }
+
+            path = os.path.join(os.path.dirname(__file__), 'list.html')
+            self.response.out.write(template.render(path, template_values))
+
+        if re.search('cont/\d+', mode):
+            match = re.search('.*/(\d+)', mode)
+            if match:
+                no = match.group(1)
+                items = BoardItem.gql("WHERE no = :no", no=int(no))
+                if items.count():
+                    url_prefix = 'http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&PageNo=1&BoardNo='
+                    template_values = {
+                        'item' : items[0],
+                        'cont' : re.sub('[\r\n]','<br />',items[0].text),
+                        'link' : url_prefix + str(items[0].no)
+                        }
+
+                    path = os.path.join(os.path.dirname(__file__), 'cont.html')
+                    self.response.out.write(template.render(path, template_values))
+
+
+# ------------------------------------------------------------------------------
+# twitter client handler
 
 class TwitterClientHandler(webapp.RequestHandler):
     def get(self, mode=''):
@@ -262,6 +402,9 @@ class TwitterClientHandler(webapp.RequestHandler):
         self.response.out.write("<a href='/twt/login'>Login via Twitter</a>")
 
 
+# ------------------------------------------------------------------------------
+# test handler
+
 class TestHandler(webapp.RequestHandler):
     def get(self):
         host = self.request.headers["Host"]
@@ -274,7 +417,8 @@ class TestHandler(webapp.RequestHandler):
 # ------------------------------------------------------------------------------
 
 def main():
-    application = webapp.WSGIApplication([('/alicia', AliciaHandler),
+    application = webapp.WSGIApplication([('/crawl/(.*)', CrawlHandler),
+                                          ('/m/(.*)', MobileHandler),
                                           ('/twt/(.*)', TwitterClientHandler),
                                           ('/test', TestHandler),
                                           ('/', MainHandler)],

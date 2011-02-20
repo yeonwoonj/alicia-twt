@@ -1,5 +1,5 @@
 application: alicia-twt
-version: 1
+version: 3
 runtime: python
 api_version: 1
 
@@ -13,6 +13,7 @@ handlers:
 
 - url: .*
   script: alicia-twt.py
+
 
 skip_files:
 - ^(.*/)?\..*
