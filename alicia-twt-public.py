@@ -98,7 +98,7 @@ class jmp:
                 logging.error(res.content)
         else:
             logging.error(res.content)
-
+            
         return s
 
 # ------------------------------------------------------------------------------
@@ -148,6 +148,9 @@ class CrawlHandler(webapp.RequestHandler):
         #self.response.out.write('<ul>')
         re_findlist = re.compile('<td class="left top_line">(.*?)</td>', re.DOTALL)
         items = re_findlist.findall(s)
+
+        logging.info('processItem - found items: items(%s),contents(%s)' % (len(items), len(s)))
+
         for item in items[::-1]:
             re_text = re.compile('title="(.*?)">', re.DOTALL)
             text = re_text.findall(item)
@@ -195,6 +198,8 @@ class CrawlHandler(webapp.RequestHandler):
                 # 너무 짧은 글은 트윗하지 않는다.
                 item.tweet = True
             else:
+                # 앨리샤 -> 앨ㄹ1샤로 변환 (검색에 걸리지 않게하려고)
+                message = re.sub(u'(앨리샤|엘리샤)', u'앨ㄹ1샤', message)
                 item.tweet = twt().status(message)
 
         else:
@@ -228,6 +233,7 @@ class CrawlHandler(webapp.RequestHandler):
         """
         crawl pages
         """
+        d = datetime.datetime.now()
         url_prefix = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo='
 
         pageLimit = 10
@@ -236,8 +242,8 @@ class CrawlHandler(webapp.RequestHandler):
             pageLimit = 3
 
         for pageNo in range(1,pageLimit):
-            logging.info('process page %d' % pageNo)
-            if self.processPage(url_prefix + str(pageNo)) == False:
+            #logging.info('process page %d' % pageNo)
+            if self.processPage("%s%s&%s" % (url_prefix,str(pageNo),d.strftime("%Y%m%d%H%M"))) == False:
                 break
 
             if pageNo == (pageLimit - 1):
@@ -409,10 +415,30 @@ class TestHandler(webapp.RequestHandler):
     def get(self):
         host = self.request.headers["Host"]
         if helper.isRelease(host):
+            #url_prefix = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo='
+            #self.downloadPage('%s1&%s' % (url_prefix, d.strftime("%Y%m%d%H%M")))
             return
         
         self.response.out.write(host)
 
+    def downloadPage(self, url):
+        try:
+            res = urlfetch.fetch(url)
+        except Exception:
+            time.sleep(5)
+            return self.downloadPage(url)
+
+        if res.status_code != 200:
+            logging.error('processPage - urlfetch error: status_code(%d)' % res.status_code)
+            return False
+
+        s = res.content.decode('utf-8')
+        self.response.out.write(s)
+
+        #re_findlist = re.compile('<td class="left top_line">(.*?)</td>', re.DOTALL)
+        #items = re_findlist.findall(s)
+
+        #logging.info('processItem - found items: items(%s),contents(%s)' % (len(items), len(s)))
 
 # ------------------------------------------------------------------------------
 
