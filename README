@@ -6,6 +6,7 @@ License:
 
 
 Changes:
+ 2011-03-21. fix urlfetch cache problem.
  2011-03-21. let each /m/cont page has its own title.
  2011-02-23. add twitter message manipulation to avoid search: 앨리샤 -> 앨ㄹ1샤
  2011-02-21. add mobile page for detail view (alpha)
