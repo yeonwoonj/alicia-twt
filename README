@@ -1,4 +1,4 @@
-
+﻿
 alicia-twt : post a tweet for each alicia freeboard's article at gametree.
 
 License:
@@ -6,6 +6,8 @@ License:
 
 
 Changes:
+ 2011-03-21. let each /m/cont page has its own title.
+ 2011-02-23. add twitter message manipulation to avoid search: 앨리샤 -> 앨ㄹ1샤
  2011-02-21. add mobile page for detail view (alpha)
  2011-02-19. fix improper parsing error when title contains double-quotation-mark.
  2011-02-19. fix item has been processed reversed order in a page.

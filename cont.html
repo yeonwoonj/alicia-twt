@@ -2,7 +2,7 @@
 <html>
 <head>
  <meta charset="utf-8" />
- <title>앨리샤 자유게시판 모바일</title> 
+ <title>{{ item.title }} - 앨리샤 자유게시판 모바일</title> 
  <link rel='stylesheet' type='text/css' href='/files/style.css' /> 
  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0a3/jquery.mobile-1.0a3.min.css" />
  <script src="http://code.jquery.com/jquery-1.5.min.js"></script>
@@ -37,10 +37,10 @@
    <ul id="comments" data-role="listview" data-theme="d" data-inset="true">
     <li id="loading" data-theme="b">(로딩 중…)</li>
    </ul>
-   <script type='text/javascript' language='javascript'>
-    load({{ item.no }});
-   </script>
   </div>
+  <script type='text/javascript' language='javascript'>
+    load({{ item.no }});
+  </script>
   <div data-role="footer" data-theme="b">
   </div>
  </div>
