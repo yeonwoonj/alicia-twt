@@ -27,7 +27,7 @@
   <div data-role="content"> 
    <ul data-role="listview" data-theme="g">
     {% for item in items %}
-    <li><a href="cont/{{ item.no }}">{{ item.title }}</a></li>
+    <li><a rel="external" href="cont/{{ item.no }}">{{ item.title }}</a></li>
     {% endfor %}
    </ul>
   </div>
