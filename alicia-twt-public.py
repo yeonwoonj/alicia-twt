@@ -11,6 +11,11 @@ import logging
 import oauth
 import urllib
 
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
+from google.appengine.dist import use_library
+use_library('django', '0.96')
+
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
@@ -34,6 +39,8 @@ class BoardItem(db.Model):
     link  = db.StringProperty()
     tweet = db.BooleanProperty()
     author = db.StringProperty()
+    yam   = db.BooleanProperty() # False if the article is waiting for yam, True if posted successfully. otherwise the value is null.
+
     #cont_long = db.StringProperty(multiline=True)
     #comments  = db.StringListProperty()
 
@@ -42,11 +49,53 @@ class BoardItem(db.Model):
 # global utility function
 
 class Helper:
+    key_pattern=''
+    
     def isRelease(self, host):
         return host != "localhost:8080"
 
     def isDebug(self, host):
         return not self.isRelease(host)
+
+    def format_twt_message(self, title, cont, date, shorten_link):
+        shorten_title = title[:30]
+        if shorten_title != title:
+            shorten_title = shorten_title.strip() + u"…"
+
+        shorten_cont = cont[:80]
+        if shorten_cont != cont:
+            shorten_cont = shorten_cont.strip() + u"…"
+
+        message = u'「%(title)s」 %(cont)s %(link)s' % {'title': shorten_title.strip(),
+                                                       'cont': shorten_cont.strip(),
+                                                       'date': date,
+                                                       'link' : shorten_link}
+
+        return message
+
+    def format_email_message(self, no, name, date, cont, mobile_link):
+        body_params = {'no': no,
+                       'author': name,
+                       'date': date,
+                       'cont': cont,
+                       'html' : re.sub(self.key_pattern,'<span style="background:pink">\g<0></span>', cont),
+                       'mlink': mobile_link}
+
+        body_text = u"""%(author)s님의 글:
+----------------------------------------
+%(cont)s
+----------------------------------------
+게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
+모바일 바로가기 ☞ %(mlink)s
+""" % body_params
+        body_html = u"""%(author)s님의 글:
+<blockquote style="margin:6px 0px 12px 0px;padding:10px;border:silver 1px solid;">%(html)s</blockquote>
+☞ <a href="http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s">게시판 바로가기</a> (<a href="%(mlink)s">모바일</a>)
+""" % body_params
+
+        return {'text':body_text, 'html':body_html}
+
+    
 
 helper = Helper()
 
@@ -55,10 +104,10 @@ helper = Helper()
 # twitter api
 
 class twt:
-    appkey = ''
-    appsec = ''
-    user_token = ''
-    user_secret = ''
+    appkey=''
+    appsec=''
+    user_token=''
+    user_secret=''
 
     def status(self, s):
         status_url = 'http://api.twitter.com/1/statuses/update.xml'
@@ -66,9 +115,8 @@ class twt:
         result = client.make_request(url=status_url, token=self.user_token, secret=self.user_secret, additional_params={'status':s}, method=urlfetch.POST)
         wasOK = result.status_code == 200
         if wasOK:
-            """
-            logging.info(result.content)
-            """
+            #logging.info(result.content)
+            pass
         else:
             logging.error(s)
             logging.error(result.content)
@@ -84,8 +132,8 @@ class twt:
 # jmp shortener api
 
 class jmp:
-    apikey = ''
-    loginid = ''
+    apikey=''
+    loginid=''
 
     def shorten(self, s):
         if re.search('http://(bit\.ly|j\.mp)', s):
@@ -105,8 +153,43 @@ class jmp:
                 logging.error(res.content)
         else:
             logging.error(res.content)
+            
+        """
+        
+        """
 
         return s
+
+
+# ------------------------------------------------------------------------------
+# yammer api
+
+class yam:
+    appkey=''
+    appsec=''
+    user_token=''
+    user_secret=''
+    user_verifier=''
+
+    def post_to_group(self, s, group_id):
+        return self.post(s, params={'group_id':group_id})
+
+    def post(self, s, params={}):
+        post_url = 'https://www.yammer.com/api/v1/messages.json'
+        client = oauth.YammerClient(self.appkey, self.appsec, '')
+        result = client.make_request(url=post_url, token=self.user_token, secret=self.user_secret, additional_params=dict({'body':s}, **params), method=urlfetch.POST)
+
+        wasOK = result.status_code == 200
+        if wasOK:
+            #logging.info(result.content)
+            pass
+        else:
+            logging.error(s)
+            logging.error(result.content)
+
+        return wasOK
+
+
 
 # ------------------------------------------------------------------------------
 # default handler
@@ -125,7 +208,7 @@ class CrawlHandler(webapp.RequestHandler):
     def get(self, mode=''):
 
         if mode == 'pages':
-            self.processPages()            
+            self.processPages()
         elif re.search('cont/\d+', mode):
             match = re.search('.*/(\d+)', mode)
             if match:
@@ -200,50 +283,37 @@ class CrawlHandler(webapp.RequestHandler):
             link = self.site_mobile + no
             shorten_link = jmp().shorten(link)
 
-            message = self.format_message(title,cont,date,shorten_link)
+            # 1. trying to tweet
+            twt_message = helper.format_twt_message(title,cont,date,shorten_link)
 
             item.link  = shorten_link
-            if len(message) < 77:
+            if len(twt_message) < 77:
                 # 너무 짧은 글은 트윗하지 않는다.
                 item.tweet = True
             else:
                 # 앨리샤 -> 앨ㄹ1샤로 변환 (검색에 걸리지 않게하려고)
                 # 변환 일단 꺼 둠. 봇으로 간주되어서 현재는  검색에 걸리지 않는 거 같다.
                 #message = re.sub(u'(앨리샤|엘리샤)', u'앨ㄹ1샤', message)
-                item.tweet = twt().status(message)
+                item.tweet = twt().status(twt_message)
 
-            # mail me if a specific words have been found
-            key_pattern = u'(버그)|(문제)|(에러)|(오류)|(서버)|(연결)|(목장)';
-            match = re.search(key_pattern, message)
+
+            # 2. mail me if a specific words have been found            
+            match = re.search(helper.key_pattern, "%s %s" % (title, cont))
             if match:
-                body_params = {'no': no,
-                               'author': name,
-                               'date': date,
-                               'cont': cont,
-                               'html' : re.sub(key_pattern,'<span style="background:pink">\g<0></span>', cont),
-                               'mlink': shorten_link}
+                # if pattern matches, mark it for yammer posting.
+                # it will be processed in the next cron job which is invoked by /yam/process.
+                item.yam = False
 
-                body_text = u"""%(author)s님의 글:
-----------------------------------------
-%(cont)s
-----------------------------------------
-게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
-모바일 바로가기 ☞ %(mlink)s
-""" % body_params
-                body_html = u"""%(author)s님의 글:
-<blockquote style="margin:6px 0px 12px 0px;padding:10px;border:silver 1px solid;">%(html)s</blockquote>
-☞ <a href="http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s">게시판 바로가기</a> (<a href="%(mlink)s">모바일</a>)
-""" % body_params
-
-                mail.send_mail(sender="alicia-twt <flow3r@ntreev.com>",
-                               to="alicia-twt@ntreev.com",
+                email_message = helper.format_email_message(no, name, date, cont, shorten_link)
+                mail.send_mail(sender='',
+                               to='',
                                subject="[%(keyword)s] %(author)s: %(title)s" % {'keyword': match.group(0),
                                                                                 'author': name,
                                                                                 'title': title},
-                               body=body_text,
-                               html=body_html)
+                               body=email_message['text'],
+                               html=email_message['html'])
         else:
-            message = self.format_message(title,cont,date,link)
+            message = helper.format_twt_message(title,cont,date,link)
             self.response.out.write("[%s]%s<br />\n" % (tweet,message))
 
             item.link = link
@@ -252,22 +322,6 @@ class CrawlHandler(webapp.RequestHandler):
         item.put()
 
         return True
-
-    def format_message(self, title, cont, date, shorten_link):
-        shorten_title = title[:30]
-        if shorten_title != title:
-            shorten_title = shorten_title.strip() + u"…"
-
-        shorten_cont = cont[:80]
-        if shorten_cont != cont:
-            shorten_cont = shorten_cont.strip() + u"…"
-
-        message = u'「%(title)s」 %(cont)s %(link)s' % {'title': shorten_title.strip(),
-                                                       'cont': shorten_cont.strip(),
-                                                       'date': date,
-                                                       'link' : shorten_link}
-
-        return message
 
     def processPages(self):
         """
@@ -450,7 +504,7 @@ class DownloadHandler(webapp.RequestHandler):
             text  = urllib.quote(item.text.encode('utf-8'))
             self.response.out.write('%s, %s\r\n' % (title, text))
             count += 1
-
+    
 
 # ------------------------------------------------------------------------------
 # twitter client handler
@@ -464,6 +518,9 @@ class TwitterClientHandler(webapp.RequestHandler):
         sss = u'123!abc~'
 
         # twitter - post a message
+        """
+        
+        """
         user_token = twt().user_token
         user_secret = twt().user_secret
 
@@ -474,7 +531,7 @@ class TwitterClientHandler(webapp.RequestHandler):
 
         if mode == 'login':
             return self.redirect(client.get_authorization_url())
-            
+
         if mode == 'verify':
             auth_token = self.request.get("oauth_token")
             auth_verifier = self.request.get("oauth_verifier")
@@ -494,6 +551,72 @@ class TwitterClientHandler(webapp.RequestHandler):
 
 
         self.response.out.write("<a href='/twt/login'>Login via Twitter</a>")
+
+
+# ------------------------------------------------------------------------------
+# yammer client handler
+
+class YammerClientHandler(webapp.RequestHandler):
+    def get(self, mode=''):
+        host = self.request.headers["Host"]
+        if helper.isRelease(host) and mode != 'process':
+            return
+
+        sss = u'123!abc~'
+
+        # yammer - post a message
+        """
+        
+        """
+        user_token = yam().user_token
+        user_secret = yam().user_secret
+
+        appkey = yam().appkey
+        appsec = yam().appsec
+        callback_url = "%s/yam/verify" % self.request.host_url
+        client = oauth.YammerClient(appkey, appsec, callback_url)
+
+        if mode == 'login':
+            return self.redirect(client.get_authorization_url())
+
+        if mode == 'verify':
+            auth_token = yam().user_token
+            auth_verifier = yam().user_verifier
+            user_info = client.get_user_info(auth_token, auth_verifier=auth_verifier)
+            return self.response.out.write(user_info)
+
+        if mode == 'timeline':
+            timeline_url = 'https://www.yammer.com/api/v1/messages.json'
+            
+            result = client.make_request(url=timeline_url, token=user_token, secret=user_secret)
+            return self.response.out.write(result.content)
+
+        if mode == 'status':
+            status_url = 'https://www.yammer.com/api/v1/messages.json'
+            
+            result = client.make_request(url=status_url, token=user_token, secret=user_secret, additional_params={'body':sss,'group_id':107032}, method=urlfetch.POST)
+            #logging.info(result.content)
+            return self.response.out.write(result.content)
+
+        if mode == 'process':
+            items = BoardItem.gql("WHERE yam = False")
+            for item in items.fetch(10):
+                alicia_keymon_group_id = 144475
+
+                email_message = helper.format_email_message(item.no, item.author, item.pubDate, item.text, item.link)
+                yam().post_to_group(email_message['text'], alicia_keymon_group_id)
+
+                item.yam = True
+                item.put()
+
+            return
+
+        items = oauth.AuthToken.all()
+        for i in items:
+            #service, token, secret, created
+            self.response.out.write("<ul><li>%s<li>%s<li>%s<li>%s</ul>" % (i.service, i.token, i.secret, i.created))
+
+        self.response.out.write("<a href='/yam/login'>Login via Yammer</a>")
 
 
 # ------------------------------------------------------------------------------
@@ -534,6 +657,7 @@ def main():
     application = webapp.WSGIApplication([('/crawl/(.*)', CrawlHandler),
                                           ('/m/(.*)', MobileHandler),
                                           ('/twt/(.*)', TwitterClientHandler),
+                                          ('/yam/(.*)', YammerClientHandler),
                                           ('/test', TestHandler),
                                           ('/download', DownloadHandler),
                                           ('/', MainHandler)],
