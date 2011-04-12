@@ -179,11 +179,12 @@ class yam:
         client = oauth.YammerClient(self.appkey, self.appsec, '')
         result = client.make_request(url=post_url, token=self.user_token, secret=self.user_secret, additional_params=dict({'body':s}, **params), method=urlfetch.POST)
 
-        wasOK = result.status_code == 200
+        wasOK = result.status_code == 201 # 201 means CREATED
         if wasOK:
             #logging.info(result.content)
             pass
         else:
+            logging.error(result.status_code)
             logging.error(s)
             logging.error(result.content)
 
@@ -604,10 +605,11 @@ class YammerClientHandler(webapp.RequestHandler):
                 alicia_keymon_group_id = 144475
 
                 email_message = helper.format_email_message(item.no, item.author, item.pubDate, item.text, item.link)
-                yam().post_to_group(email_message['text'], alicia_keymon_group_id)
+                wasOK = yam().post_to_group(email_message['text'], alicia_keymon_group_id)
 
-                item.yam = True
-                item.put()
+                if wasOK:
+                    item.yam = True
+                    item.put()
 
             return
 
