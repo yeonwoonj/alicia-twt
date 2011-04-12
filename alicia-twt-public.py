@@ -16,10 +16,12 @@ from google.appengine.ext.webapp import util
 
 from google.appengine.ext import db
 from google.appengine.api import urlfetch
+from google.appengine.api import mail
 
 from google.appengine.ext.webapp import template
 
 from django.utils import simplejson
+
 
 # ------------------------------------------------------------------------------
 # DB Model
@@ -70,6 +72,11 @@ class twt:
         else:
             logging.error(s)
             logging.error(result.content)
+
+            # 중복 사인이 오면 포스팅된 걸로 간주하자.
+            if result.content.find('<error>Status is a duplicate.</error>') != -1:
+                wasOK = True
+
         return wasOK
 
 
@@ -98,7 +105,7 @@ class jmp:
                 logging.error(res.content)
         else:
             logging.error(res.content)
-            
+
         return s
 
 # ------------------------------------------------------------------------------
@@ -154,7 +161,9 @@ class CrawlHandler(webapp.RequestHandler):
         for item in items[::-1]:
             re_text = re.compile('title="(.*?)">', re.DOTALL)
             text = re_text.findall(item)
-            name = re.findall('<span class="name">(.*?)</span>', item)
+            name = re.findall('<span class="name"><a title=".*?" class="pretip-name" title=".*?">(.*?)</a></span>', item)
+            if not name:
+                name = re.findall('<span class="name">(.*?)</span>', item)
             date = re.findall('<span class="date">(.*?)</span>', item)
             link = re.findall('href="(.*?)"', item)
 
@@ -199,13 +208,44 @@ class CrawlHandler(webapp.RequestHandler):
                 item.tweet = True
             else:
                 # 앨리샤 -> 앨ㄹ1샤로 변환 (검색에 걸리지 않게하려고)
-                message = re.sub(u'(앨리샤|엘리샤)', u'앨ㄹ1샤', message)
+                # 변환 일단 꺼 둠. 봇으로 간주되어서 현재는  검색에 걸리지 않는 거 같다.
+                #message = re.sub(u'(앨리샤|엘리샤)', u'앨ㄹ1샤', message)
                 item.tweet = twt().status(message)
 
+            # mail me if a specific words have been found
+            key_pattern = u'(버그)|(문제)|(에러)|(오류)|(서버)|(연결)|(목장)';
+            match = re.search(key_pattern, message)
+            if match:
+                body_params = {'no': no,
+                               'author': name,
+                               'date': date,
+                               'cont': cont,
+                               'html' : re.sub(key_pattern,'<span style="background:pink">\g<0></span>', cont),
+                               'mlink': shorten_link}
+
+                body_text = u"""%(author)s님의 글:
+----------------------------------------
+%(cont)s
+----------------------------------------
+게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
+모바일 바로가기 ☞ %(mlink)s
+""" % body_params
+                body_html = u"""%(author)s님의 글:
+<blockquote style="margin:6px 0px 12px 0px;padding:10px;border:silver 1px solid;">%(html)s</blockquote>
+☞ <a href="http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s">게시판 바로가기</a> (<a href="%(mlink)s">모바일</a>)
+""" % body_params
+
+                mail.send_mail(sender="alicia-twt <flow3r@ntreev.com>",
+                               to="alicia-twt@ntreev.com",
+                               subject="[%(keyword)s] %(author)s: %(title)s" % {'keyword': match.group(0),
+                                                                                'author': name,
+                                                                                'title': title},
+                               body=body_text,
+                               html=body_html)
         else:
             message = self.format_message(title,cont,date,link)
             self.response.out.write("[%s]%s<br />\n" % (tweet,message))
-            
+
             item.link = link
             item.tweet = True
 
@@ -239,7 +279,7 @@ class CrawlHandler(webapp.RequestHandler):
         pageLimit = 10
         host = self.request.headers["Host"]
         if helper.isDebug(host):
-            pageLimit = 3
+            pageLimit = 2
 
         for pageNo in range(1,pageLimit):
             #logging.info('process page %d' % pageNo)
@@ -363,6 +403,55 @@ class MobileHandler(webapp.RequestHandler):
                     self.response.out.write(template.render(path, template_values))
 
 
+
+# ------------------------------------------------------------------------------
+# download handler - download recent boarditem
+
+class DownloadHandler(webapp.RequestHandler):
+    def get(self):
+
+        fromDate = self.request.get('from', None)
+        toDate   = self.request.get('to', None)
+        dayDate  = self.request.get('day', None)
+
+        if (fromDate == None or toDate == None) and (dayDate == None):
+            self.response.headers['Content-Type'] = 'text/plain'
+            self.response.out.write('insufficient parameter')
+            return
+
+        try:
+            fromDate = datetime.datetime.strptime(fromDate, '%Y-%m-%d')
+            toDate = datetime.datetime.strptime(toDate, '%Y-%m-%d')
+            dateRange = True
+        except:
+            dateRange = False
+
+        if dateRange == False:
+            try:
+                dayDate = datetime.datetime.strptime(dayDate, '%Y-%m-%d')
+                fromDate = dayDate
+                toDate = dayDate
+            except:
+                self.response.headers['Content-Type'] = 'text/plain'
+                self.response.out.write('invalid parameter')
+                return
+
+        toDate += datetime.timedelta(days=1)
+        items = BoardItem.gql("WHERE pubDate > '%s' and pubDate < '%s'" % (fromDate.strftime('%Y.%m.%d'),
+                                                                           toDate.strftime('%Y.%m.%d')))
+
+        self.response.headers['Content-Type'] = 'application/octet-stream'
+        self.response.headers['Content-Disposition'] = 'filename=encoded-dump-%s-%s.csv' % (fromDate.strftime('%Y%m%d'),
+                                                                                            toDate.strftime('%Y%m%d'))
+
+        count = 0
+        for item in items:
+            title = urllib.quote(item.title.encode('utf-8'))
+            text  = urllib.quote(item.text.encode('utf-8'))
+            self.response.out.write('%s, %s\r\n' % (title, text))
+            count += 1
+
+
 # ------------------------------------------------------------------------------
 # twitter client handler
 
@@ -375,7 +464,6 @@ class TwitterClientHandler(webapp.RequestHandler):
         sss = u'123!abc~'
 
         # twitter - post a message
-
         user_token = twt().user_token
         user_secret = twt().user_secret
 
@@ -447,6 +535,7 @@ def main():
                                           ('/m/(.*)', MobileHandler),
                                           ('/twt/(.*)', TwitterClientHandler),
                                           ('/test', TestHandler),
+                                          ('/download', DownloadHandler),
                                           ('/', MainHandler)],
                                          debug=True)
     util.run_wsgi_app(application)
