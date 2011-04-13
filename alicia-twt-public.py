@@ -95,7 +95,24 @@ class Helper:
 
         return {'text':body_text, 'html':body_html}
 
-    
+    def format_yam_message(self, no, name, date, title, cont, mobile_link):
+        body_params = {'no': no,
+                       'author': name,
+                       'date': date,
+                       'cont': cont,
+                       'mlink': mobile_link,
+                       'title': title }
+
+        body_text = u"""%(author)s님의 글:
+----------------------------------------
+「%(title)s」
+%(cont)s
+----------------------------------------
+게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
+모바일 바로가기 ☞ %(mlink)s
+""" % body_params
+
+        return body_text
 
 helper = Helper()
 
@@ -602,10 +619,10 @@ class YammerClientHandler(webapp.RequestHandler):
         if mode == 'process':
             items = BoardItem.gql("WHERE yam = False")
             for item in items.fetch(10):
-                alicia_keymon_group_id = 144475
+                alicia_keymon_group_id = 144628
 
-                email_message = helper.format_email_message(item.no, item.author, item.pubDate, item.text, item.link)
-                wasOK = yam().post_to_group(email_message['text'], alicia_keymon_group_id)
+                yam_message = helper.format_yam_message(item.no, item.author, item.pubDate, item.title, item.text, item.link)
+                wasOK = yam().post_to_group(yam_message, alicia_keymon_group_id)
 
                 if wasOK:
                     item.yam = True
