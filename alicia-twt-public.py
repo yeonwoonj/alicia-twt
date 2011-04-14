@@ -103,15 +103,18 @@ class Helper:
                        'mlink': mobile_link,
                        'title': title }
 
-        body_text = u"""%(author)s님의 글:
+        # remove preventing preview chars
+        cont = re.sub(r'^((\S)\2{20}\2+)', '', cont).strip()
+
+        body_text = u"""%(author)s님의 글: 「%(title)s」
 ----------------------------------------
-「%(title)s」
-%(cont)s
-----------------------------------------
-게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
-모바일 바로가기 ☞ %(mlink)s
+%(cont)s %(mlink)s
 """ % body_params
 
+        """
+        게시판 바로가기 ☞ http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&BoardNo=%(no)s
+        모바일 바로가기 ☞ %(mlink)s
+        """
         return body_text
 
 helper = Helper()
