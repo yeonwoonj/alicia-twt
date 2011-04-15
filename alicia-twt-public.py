@@ -57,10 +57,15 @@ class Helper:
     def isDebug(self, host):
         return not self.isRelease(host)
 
+    def remove_preview_prevention_chars_with_strip(self, s):
+        return re.sub(r'^((\S)\2{20}\2+)', '', s).strip()
+
     def format_twt_message(self, title, cont, date, shorten_link):
         shorten_title = title[:30]
         if shorten_title != title:
             shorten_title = shorten_title.strip() + u"…"
+
+        cont = self.remove_preview_prevention_chars_with_strip(cont)
 
         shorten_cont = cont[:80]
         if shorten_cont != cont:
@@ -77,7 +82,7 @@ class Helper:
         body_params = {'no': no,
                        'author': name,
                        'date': date,
-                       'cont': cont,
+                       'cont': self.remove_preview_prevention_chars_with_strip(cont),
                        'html' : re.sub(self.key_pattern,'<span style="background:pink">\g<0></span>', cont),
                        'mlink': mobile_link}
 
@@ -103,8 +108,7 @@ class Helper:
                        'mlink': mobile_link,
                        'title': title }
 
-        # remove preventing preview chars
-        cont = re.sub(r'^((\S)\2{20}\2+)', '', cont).strip()
+        cont = self.remove_preview_prevention_chars_with_strip(cont)
 
         body_text = u"""%(author)s님의 글: 「%(title)s」
 ----------------------------------------
