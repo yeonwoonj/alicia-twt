@@ -1,14 +1,12 @@
 ﻿=====================================================
-alicia-twt : post a tweet for each alicia freeboard's article at gametree.
+alicia-twt : post a tweet for each `alicia freeboard <http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1>`_'s article at gametree.
 =====================================================
 
-======
 License:
 ======
  Public domain
 
 
-=======
 Changes:
 =======
 - 2011-03-21. fix urlfetch cache problem.
@@ -21,7 +19,6 @@ Changes:
 - 2011-02-17. inital version
 
 
-==================
 How to run this program:
 ==================
  1. this program runs under the Google App Engine environment.
