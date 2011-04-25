@@ -295,7 +295,7 @@ class CrawlHandler(webapp.RequestHandler):
             if not name:
                 img_filename = re.findall(u'<img src="/_Files/Emblem/(.+?)" alt="운영자" />', item)
                 if img_filename:
-                    name = helper.get_GM_nickname(img_filename);
+                    name = helper.get_GM_nickname(img_filename[0]);
 
             # 3. if failed also, finally we need to get whose nickname.
             if not name:
