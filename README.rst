@@ -9,6 +9,9 @@ License:
 
 Changes:
 =======
+- 2011-04-24. fix extract GM nickname properly also.
+- 2011-04-12. add keyword monitoring reports to yammer feature.
+- 2011-04-11. add db dump, add keyword monitoring feature.
 - 2011-03-21. fix urlfetch cache problem.
 - 2011-03-21. let each /m/cont page has its own title.
 - 2011-02-23. add twitter message manipulation to avoid search: 앨리샤 -> 앨ㄹ1샤
