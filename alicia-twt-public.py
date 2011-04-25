@@ -57,6 +57,24 @@ class Helper:
     def isDebug(self, host):
         return not self.isRelease(host)
 
+    def get_GM_nickname(self, img_filename):
+        d = {
+            "ntsm01.gif": u"GM야생마",
+            "ntsm02.gif": u"GM말발굽",
+            "ntsm05.gif": u"GM당근",
+            "ntsm06.gif": u"GM옥수수",
+            "ntsm08.gif": u"GM말근육",
+            "ntsm10.gif": u"GM적토마",
+            "ntsm15.gif": u"GM말근육",
+            "ntsm16.gif": u"GM말근육",
+            "ntsm17.gif": u"GM각설탕",
+        }
+
+        try:
+            return d[img_filename]
+        except KeyError:
+            return u"운영자"
+
     def remove_preview_prevention_chars_with_strip(self, s):
         return re.sub(r'^((\S)\2{20}\2+)', '', s).strip()
 
@@ -269,9 +287,20 @@ class CrawlHandler(webapp.RequestHandler):
         for item in items[::-1]:
             re_text = re.compile('title="(.*?)">', re.DOTALL)
             text = re_text.findall(item)
+
+            # 1. attempt to get user-id who does not have a nickname
             name = re.findall('<span class="name"><a title=".*?" class="pretip-name" title=".*?">(.*?)</a></span>', item)
+
+            # 2. if failed, trying to get GM name.
+            if not name:
+                img_filename = re.findall(u'<img src="/_Files/Emblem/(.+?)" alt="운영자" />', item)
+                if img_filename:
+                    name = helper.get_GM_nickname(img_filename);
+
+            # 3. if failed also, finally we need to get whose nickname.
             if not name:
                 name = re.findall('<span class="name">(.*?)</span>', item)
+
             date = re.findall('<span class="date">(.*?)</span>', item)
             link = re.findall('href="(.*?)"', item)
 
