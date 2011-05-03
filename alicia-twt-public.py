@@ -75,6 +75,9 @@ class Helper:
         except KeyError:
             return u"운영자"
 
+    def isMaintenance(self, content):
+        return content[:1000].find(u'<title>앨리샤 - 죄송합니다. 현재 점검 작업 중입니다.</title>') >= 0
+
     def remove_preview_prevention_chars_with_strip(self, s):
         return re.sub(r'^((\S)\2{20}\2+)', '', s).strip()
 
@@ -241,6 +244,11 @@ class MainHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write('<a href="http://twitter.com/alicia_twt">http://twitter.com/alicia_twt</a>')
 
+        #url = 'http://alicia.gametree.co.kr/Community/List.aspx?BoardType=1&PageNo=1'
+        #res = urlfetch.fetch(url, headers={"Pragma":"no-cache,max-age=0","Cache-Control":"no-cache"})
+        #self.response.out.write(url + res.content);
+
+
 # ------------------------------------------------------------------------------
 # crawl handler
 
@@ -277,6 +285,10 @@ class CrawlHandler(webapp.RequestHandler):
 
         wholeNew = True # 전체가 새로운 게시글인가?
         s = res.content.decode('utf-8')
+
+        if helper.isMaintenance(s):
+            logging.warn('processPage - stop processing due to maintenance: %s' % url)
+            return False
         
         #self.response.out.write('<ul>')
         re_findlist = re.compile('<td class="left top_line">(.*?)</td>', re.DOTALL)
@@ -402,8 +414,10 @@ class CrawlHandler(webapp.RequestHandler):
         """
         crawl entire content and comments
         """
+
         url_prefix = 'http://alicia.gametree.co.kr/Community/View.aspx?BoardType=1&PageNo=1&BoardNo='
         url = url_prefix + no
+
         try:
             res = urlfetch.fetch(url)
         except Exception:
@@ -420,57 +434,64 @@ class CrawlHandler(webapp.RequestHandler):
             json = u'{"result":"삭제된 게시물입니다."}'
             return self.response.out.write(json)
 
-        # parse content
-        name = re.search('<span class="name">(.*?)</span>', s)
-        name = name.group(1)
+        maintenance = False
+        if helper.isMaintenance(s):
+            maintenance = True
 
-        head = s.find('<div class="n-view">')
-        tail = s.find('<div class="n-reply-up" id="n-reply-up">')
-        body = s[head:tail]
+        if maintenance:
+            json = u'{"result": "앨리샤 홈페이지가 점검 중입니다.", "name": "", "cont": "", "comments": []}'
+        else:
+            # parse content
+            name = re.search('<span class="name">(.*?)</span>', s)
+            name = name.group(1)
 
-        images = re.findall('"/_Files/CommunityAttach/FreeBoard/(.*?).jpg"', body)
-        imgtag = '<div id="n-gallery">'
-        for img in images:
-            imgtag += u'<img src="http://alicia.gametree.co.kr/_Files/CommunityAttach/FreeBoard/%s.jpg" alt="첨부파일" /><br />' % img
-        imgtag += '</div>'
-        imgtag = re.sub('[\r\n]','', imgtag.strip())
-        imgtag = re.sub('"', '\\"', imgtag)
-            
-        re_cont = re.compile('<div class="nv-desc noline">(.*?)</div>', re.DOTALL)
-        cont = re_cont.search(body).group(1)
-        cont = re.sub('[\r\n]','', cont.strip())
-        cont = re.sub('"', '\\"', cont)
+            head = s.find('<div class="n-view">')
+            tail = s.find('<div class="n-reply-up" id="n-reply-up">')
+            body = s[head:tail]
 
-        cont_all = imgtag + cont
+            images = re.findall('"/_Files/CommunityAttach/FreeBoard/(.*?).jpg"', body)
+            imgtag = '<div id="n-gallery">'
+            for img in images:
+                imgtag += u'<img src="http://alicia.gametree.co.kr/_Files/CommunityAttach/FreeBoard/%s.jpg" alt="첨부파일" /><br />' % img
+            imgtag += '</div>'
+            imgtag = re.sub('[\r\n]','', imgtag.strip())
+            imgtag = re.sub('"', '\\"', imgtag)
 
-        re_comment = re.compile('<p class="r-info"><strong>(.*?)</strong>.*?</p>.*?<p class="r-desc">(.*?)</p>', re.DOTALL)
-        comments = re_comment.findall(s)
-
-        # parse comments
-        arr = []
-        for c in comments:
-            name = c[0]
-            re_name = re.search('alt="(.*?)"', name)
-            if re_name:
-                name = re_name.group(1)
-
-            cont = re.sub('[\r\n]','', c[1])
+            re_cont = re.compile('<div class="nv-desc noline">(.*?)</div>', re.DOTALL)
+            cont = re_cont.search(body).group(1)
+            cont = re.sub('[\r\n]','', cont.strip())
             cont = re.sub('"', '\\"', cont)
 
-            arr.append(simplejson.dumps({'name':name,'cont':cont}))
+            cont_all = imgtag + cont
 
-        # make JSON string
+            re_comment = re.compile('<p class="r-info"><strong>(.*?)</strong>.*?</p>.*?<p class="r-desc">(.*?)</p>', re.DOTALL)
+            comments = re_comment.findall(s)
 
-        result = len(comments)
-        if result > 0:
-            result = u'댓글 %d개' % result
-        else:
-            result = u'댓글이 없습니다.'
+            # parse comments
+            arr = []
+            for c in comments:
+                name = c[0]
+                re_name = re.search('alt="(.*?)"', name)
+                if re_name:
+                    name = re_name.group(1)
 
-        json = u'{"result": "%(result)s", "name": "%(name)s", "cont": "%(cont)s", "comments": [%(comments)s]}' % {'result': result,
-                                                                                                                  'name': name,
-                                                                                                                  'cont': cont_all,
-                                                                                                                  'comments': ','.join(arr)}
+                cont = re.sub('[\r\n]','', c[1])
+                cont = re.sub('"', '\\"', cont)
+
+                arr.append(simplejson.dumps({'name':name,'cont':cont}))
+
+            # make JSON string
+
+            result = len(comments)
+            if result > 0:
+                result = u'댓글 %d개' % result
+            else:
+                result = u'댓글이 없습니다.'
+
+            json = u'{"result": "%(result)s", "name": "%(name)s", "cont": "%(cont)s", "comments": [%(comments)s]}' % {'result': result,
+                                                                                                                      'name': name,
+                                                                                                                      'cont': cont_all,
+                                                                                                                      'comments': ','.join(arr)}
 
         self.response.out.write(json)
 

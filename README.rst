@@ -9,6 +9,7 @@ License:
 
 Changes:
 =======
+- 2011-05-03. add message for homepage maintenance.
 - 2011-04-24. fix extract GM nickname properly also.
 - 2011-04-12. add keyword monitoring reports to yammer feature.
 - 2011-04-11. add db dump, add keyword monitoring feature.
