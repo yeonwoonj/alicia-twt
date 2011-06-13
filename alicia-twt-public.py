@@ -449,10 +449,10 @@ class CrawlHandler(webapp.RequestHandler):
             tail = s.find('<div class="n-reply-up" id="n-reply-up">')
             body = s[head:tail]
 
-            images = re.findall('"/_Files/CommunityAttach/FreeBoard/(.*?).jpg"', body)
+            images = re.findall('"/_Files/CommunityAttach/FreeBoard/(.+?)\.(.+?)"', body)
             imgtag = '<div id="n-gallery">'
             for img in images:
-                imgtag += u'<img src="http://alicia.gametree.co.kr/_Files/CommunityAttach/FreeBoard/%s.jpg" alt="첨부파일" /><br />' % img
+                imgtag += u'<img src="http://alicia.gametree.co.kr/_Files/CommunityAttach/FreeBoard/%s.%s" alt="첨부파일" /><br />' % img
             imgtag += '</div>'
             imgtag = re.sub('[\r\n]','', imgtag.strip())
             imgtag = re.sub('"', '\\"', imgtag)

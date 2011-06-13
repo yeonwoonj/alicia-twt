@@ -9,6 +9,7 @@ License:
 
 Changes:
 =======
+- 2011-06-13. fix bug that /m/cont doesn't handle image file extension except jpg.
 - 2011-05-03. add message for homepage maintenance.
 - 2011-04-24. fix extract GM nickname properly also.
 - 2011-04-12. add keyword monitoring reports to yammer feature.
