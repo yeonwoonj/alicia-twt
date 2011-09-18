@@ -3,6 +3,6 @@ cron:
   url: /crawl/pages
   schedule: every 3 minutes
 
-- description: yam if it exists
-  url: /yam/process
-  schedule: every 2 minutes
+#- description: yam if it exists
+#  url: /yam/process
+#  schedule: every 2 minutes
